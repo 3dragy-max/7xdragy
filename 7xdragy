@@ -36,9 +36,8 @@ DESTROY_TEXTS = [
     "Gc left le rndyk pille",
 ]
 
-NC_GLITCH = "Chup rndyke bcheࣩࣩࣩࣩࣩࣩࣩࣩࣩࣩࣧࣧࣧࣧࣧࣧࣧࣧࣧࣧࣧࣧࣨࣨࣨࣨࣨࣨࣨࣨࣨࣨࣨࣨ"
-NC_FAST = True
-
+NC_GLITCH = "𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫"
+NC_GAP = 0.8
 REACT_EMOJI = "🤣"
 
 destroy_name = None; destroy_active = False
@@ -63,7 +62,7 @@ async def init_bots():
             await app.initialize()
             bot_apps.append(app)
         except: pass
-    print(f"ULTRON — {len(bot_apps)}/12")
+    print(f"ULTRON ONLINE — {len(bot_apps)}/12 bots")
 
 async def all_msg(chat_id, text, reply=None):
     async def send(app):
@@ -74,15 +73,17 @@ async def all_msg(chat_id, text, reply=None):
 async def all_react(chat_id, msg_id):
     await asyncio.gather(*[a.bot.set_message_reaction(chat_id, msg_id, REACT_EMOJI) for a in bot_apps], return_exceptions=True)
 
+# ═══════════ COMMANDS ═══════════
+
 async def menu(update, context):
     await update.message.reply_text("""⚡ ULTRON
 /destroy /stopdestruction
 /attack /stopattack
-/spam /gcname /stopgcname
+/reply /spam
+/gcname /stopgcname
 /react /stopreact
-/reply <text>
 /sudo /takesudo /sudolist
-/check /stopall""")
+/check /stopall /menu""")
 
 async def destroy(update, context):
     global destroy_name, destroy_active
@@ -90,6 +91,7 @@ async def destroy(update, context):
     if not context.args: return
     destroy_name = context.args[0]; destroy_active = True
     asyncio.create_task(destroy_loop(update.effective_chat.id))
+    await update.message.reply_text(f"⚡ {destroy_name} marked for destruction.")
 
 async def destroy_loop(chat_id):
     while destroy_active and destroy_name:
@@ -97,28 +99,37 @@ async def destroy_loop(chat_id):
         await asyncio.sleep(0.02)
 
 async def stopdestruction(update, context):
-    global destroy_active
+    global destroy_active, destroy_name
     if not ok(update.effective_user.id): return
-    destroy_active = False
+    if destroy_active:
+        await update.message.reply_text(f"⚡ {destroy_name} spared. For now.")
+        destroy_active = False
 
 async def attack(update, context):
     global attack_id
     if not ok(update.effective_user.id): return
     if not update.message.reply_to_message: return
     attack_id = update.message.reply_to_message.from_user.id
+    name = update.message.reply_to_message.from_user.first_name
+    await update.message.reply_text(f"⚡ {name} is now the target.")
 
 async def stopattack(update, context):
     global attack_id
     if not ok(update.effective_user.id): return
-    attack_id = None
+    if attack_id:
+        await update.message.reply_text("⚡ Target released. Pathetic.")
+        attack_id = None
 
 async def reply_cmd(update, context):
     global custom_text, attack_id
     if not ok(update.effective_user.id): return
-    if not context.args: return
+    if not context.args: return await update.message.reply_text("/reply <text>")
     custom_text = " ".join(context.args)
     if update.message.reply_to_message:
         attack_id = update.message.reply_to_message.from_user.id
+        await update.message.reply_text(f"⚡ Reply set. Target locked.")
+    else:
+        await update.message.reply_text(f"⚡ Reply set: {custom_text}")
 
 async def spam(update, context):
     global spam_text, spam_active
@@ -126,6 +137,7 @@ async def spam(update, context):
     if not update.message.reply_to_message or not update.message.reply_to_message.text: return
     spam_text = stretch(update.message.reply_to_message.text); spam_active = True
     asyncio.create_task(spam_loop(update.effective_chat.id))
+    await update.message.reply_text("⚡ Spam initiated.")
 
 async def spam_loop(chat_id):
     while spam_active and spam_text:
@@ -138,49 +150,59 @@ async def gcname(update, context):
     if not context.args: return
     gcname_text = " ".join(context.args); gcname_active = True
     asyncio.create_task(gcname_loop(update.effective_chat.id))
+    await update.message.reply_text("⚡ GC name warping...")
 
 async def gcname_loop(chat_id):
     while gcname_active and gcname_text:
-        tasks = [bot.bot.set_chat_title(chat_id, f"{gcname_text} {NC_GLITCH}"[:255]) for bot in bot_apps]
+        full = f"{gcname_text} {NC_GLITCH}"[:255]
+        tasks = [bot.bot.set_chat_title(chat_id, full) for bot in bot_apps]
         await asyncio.gather(*tasks, return_exceptions=True)
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(NC_GAP)
 
 async def stopgcname(update, context):
     global gcname_active
     if not ok(update.effective_user.id): return
     gcname_active = False
+    await update.message.reply_text("⚡ GC name frozen.")
 
 async def react(update, context):
     global react_id
     if not ok(update.effective_user.id): return
     if not context.args: return
     react_id = int(context.args[0])
+    await update.message.reply_text(f"⚡ Reacting to {react_id}.")
 
 async def stopreact(update, context):
     global react_id
     if not ok(update.effective_user.id): return
     react_id = None
+    await update.message.reply_text("⚡ Reactions halted.")
 
 async def stopall(update, context):
     global destroy_active, attack_id, gcname_active, spam_active, react_id
     if not ok(update.effective_user.id): return
     destroy_active = attack_id = gcname_active = spam_active = False; react_id = None
+    await update.message.reply_text("⚡ All systems terminated.")
 
 async def check(update, context):
     await all_msg(update.effective_chat.id, "⚡")
+    await update.message.reply_text(f"⚡ Fleet: {len(bot_apps)}/12 operational.")
 
 async def sudo(update, context):
     if update.effective_user.id != OWNER_ID: return
-    if context.args: sudo_users.add(int(context.args[0])); save_sudo()
+    if context.args:
+        sudo_users.add(int(context.args[0])); save_sudo()
+        await update.message.reply_text("⚡ Access granted.")
 
 async def takesudo(update, context):
     if update.effective_user.id != OWNER_ID: return
     if context.args:
         uid = int(context.args[0])
         if uid != OWNER_ID: sudo_users.discard(uid); save_sudo()
+        await update.message.reply_text("⚡ Access revoked.")
 
 async def sudolist(update, context):
-    await update.message.reply_text(f"Sudo: {sudo_users}")
+    await update.message.reply_text(f"⚡ Sudo: {sudo_users}")
 
 async def handler(update, context):
     global attack_id, custom_text, react_id
