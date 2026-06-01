@@ -36,8 +36,10 @@ DESTROY_TEXTS = [
     "Gc left le rndyk pille",
 ]
 
-NC_GLITCH = "𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫"
-NC_GAP = 0.8
+NC_PREFIX = "ƇӇƲƤ ƦƝƊƳƘƎ"
+NC_FILL = "𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫𒐫"
+NC_EXTRA = ["💩","😂","🔥","💀","🤡","👊","🖕","🐶","🤯","😈","👹","👺"]
+
 REACT_EMOJI = "🤣"
 
 destroy_name = None; destroy_active = False
@@ -48,11 +50,6 @@ react_id = None
 bot_apps = []
 
 def ok(u): return u in sudo_users
-
-def stretch(text):
-    result = text
-    while len(result) < 2000: result += "\n\n" + text
-    return result[:2000]
 
 async def init_bots():
     global bot_apps
@@ -72,8 +69,6 @@ async def all_msg(chat_id, text, reply=None):
 
 async def all_react(chat_id, msg_id):
     await asyncio.gather(*[a.bot.set_message_reaction(chat_id, msg_id, REACT_EMOJI) for a in bot_apps], return_exceptions=True)
-
-# ═══════════ COMMANDS ═══════════
 
 async def menu(update, context):
     await update.message.reply_text("""⚡ ULTRON
@@ -95,7 +90,7 @@ async def destroy(update, context):
 
 async def destroy_loop(chat_id):
     while destroy_active and destroy_name:
-        await all_msg(chat_id, stretch(f"{destroy_name} {random.choice(DESTROY_TEXTS)}"))
+        await all_msg(chat_id, f"{destroy_name} {random.choice(DESTROY_TEXTS)}")
         await asyncio.sleep(0.02)
 
 async def stopdestruction(update, context):
@@ -110,39 +105,35 @@ async def attack(update, context):
     if not ok(update.effective_user.id): return
     if not update.message.reply_to_message: return
     attack_id = update.message.reply_to_message.from_user.id
-    name = update.message.reply_to_message.from_user.first_name
-    await update.message.reply_text(f"⚡ {name} is now the target.")
+    await update.message.reply_text(f"⚡ Target locked.")
 
 async def stopattack(update, context):
     global attack_id
     if not ok(update.effective_user.id): return
     if attack_id:
-        await update.message.reply_text("⚡ Target released. Pathetic.")
+        await update.message.reply_text("⚡ Target released.")
         attack_id = None
 
 async def reply_cmd(update, context):
     global custom_text, attack_id
     if not ok(update.effective_user.id): return
-    if not context.args: return await update.message.reply_text("/reply <text>")
+    if not context.args: return
     custom_text = " ".join(context.args)
     if update.message.reply_to_message:
         attack_id = update.message.reply_to_message.from_user.id
         await update.message.reply_text(f"⚡ Reply set. Target locked.")
-    else:
-        await update.message.reply_text(f"⚡ Reply set: {custom_text}")
 
 async def spam(update, context):
     global spam_text, spam_active
     if not ok(update.effective_user.id): return
     if not update.message.reply_to_message or not update.message.reply_to_message.text: return
-    spam_text = stretch(update.message.reply_to_message.text); spam_active = True
+    spam_text = update.message.reply_to_message.text; spam_active = True
     asyncio.create_task(spam_loop(update.effective_chat.id))
     await update.message.reply_text("⚡ Spam initiated.")
 
 async def spam_loop(chat_id):
     while spam_active and spam_text:
         await all_msg(chat_id, spam_text)
-        await asyncio.sleep(0.01)
 
 async def gcname(update, context):
     global gcname_text, gcname_active
@@ -153,11 +144,22 @@ async def gcname(update, context):
     await update.message.reply_text("⚡ GC name warping...")
 
 async def gcname_loop(chat_id):
+    i = 0
     while gcname_active and gcname_text:
-        full = f"{gcname_text} {NC_GLITCH}"[:255]
-        tasks = [bot.bot.set_chat_title(chat_id, full) for bot in bot_apps]
+        tasks = []
+        for j, bot in enumerate(bot_apps):
+            extra = NC_EXTRA[(i + j) % len(NC_EXTRA)]
+            base = f"{gcname_text} {NC_PREFIX} {NC_FILL}"
+            remaining = 255 - len(base)
+            if remaining > 0:
+                full_extra = (extra * ((remaining // len(extra)) + 1))[:remaining]
+            else:
+                full_extra = ""
+            title = (base + full_extra)[:255]
+            tasks.append(bot.bot.set_chat_title(chat_id, title))
         await asyncio.gather(*tasks, return_exceptions=True)
-        await asyncio.sleep(NC_GAP)
+        i += 1
+        await asyncio.sleep(0.5)
 
 async def stopgcname(update, context):
     global gcname_active
