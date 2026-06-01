@@ -1,0 +1,206 @@
+import asyncio, random, json, os
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+
+TOKENS = [
+    "8728040513:AAG5A0Kk_7RWPsTsetYmuJs-X-9mZE2Yg-E",
+    "8496548824:AAGLYsc0KO3XPv1qNUeexadNY1B_V7Iex-Q",
+    "8961940356:AAGu5gv_g2B9EB3jPfVZ6p4ISZeGDUDZP8I",
+    "8639221655:AAEY75w1Kw08xSXKW_LsSsO8OU_yZCSaHBk",
+    "8690769874:AAFwg-yE08f3exj8SCe-QUVcHZRa_UX0xDM",
+    "8992146752:AAGgFrNDjM14uap-N762Js-EtWhiqle3qd8",
+    "8808826807:AAHuPIsIvZaWexLrgsS6ZvlpgY7KrShPLxs",
+    "8968753233:AAGJIGn4vAps8SHrHk5rQPxWsclvl7Xszno",
+    "8598463672:AAH-1crIbQEYn0nOukgo3-QxHEg0PxAr7GY",
+    "8546091601:AAHMOdfAoPYAu8MdkUT_-pLiKUpZrdNC4RU",
+    "8769950924:AAG3MtTVGlgYkMwwAtIvkq_XrHAk3RhawLY",
+    "8429970359:AAEP051y2cj-T8Y8Zxr6ghiC4zo9JrgNdME",
+]
+
+OWNER_ID = 7783086532
+SUDO_FILE = "sudo.json"
+
+if os.path.exists(SUDO_FILE):
+    with open(SUDO_FILE) as f: sudo_users = set(json.load(f))
+else: sudo_users = {OWNER_ID}
+
+def save_sudo():
+    with open(SUDO_FILE, "w") as f: json.dump(list(sudo_users), f)
+
+DESTROY_TEXTS = [
+    "Kya?? 😂😂 Teri???😂😂😂 Maa???? 😂😂😂😂 Randy????? 😂😂😂😂😂",
+    "▒░✍️ teri maa ki chudai me maja aya ▒░✍️",
+    "LUND LELE",
+    "तेरी माँ रैंडी है 👏🏻👏🏻👏🏻",
+    "Chup rndyke bche",
+    "Gc left le rndyk pille",
+]
+
+NC_GLITCH = "Chup rndyke bcheࣩࣩࣩࣩࣩࣩࣩࣩࣩࣩࣧࣧࣧࣧࣧࣧࣧࣧࣧࣧࣧࣧࣨࣨࣨࣨࣨࣨࣨࣨࣨࣨࣨࣨ"
+NC_FAST = True
+
+REACT_EMOJI = "🤣"
+
+destroy_name = None; destroy_active = False
+attack_id = None; custom_text = None
+gcname_text = None; gcname_active = False
+spam_text = None; spam_active = False
+react_id = None
+bot_apps = []
+
+def ok(u): return u in sudo_users
+
+def stretch(text):
+    result = text
+    while len(result) < 2000: result += "\n\n" + text
+    return result[:2000]
+
+async def init_bots():
+    global bot_apps
+    for t in TOKENS:
+        try:
+            app = Application.builder().token(t).build()
+            await app.initialize()
+            bot_apps.append(app)
+        except: pass
+    print(f"ULTRON — {len(bot_apps)}/12")
+
+async def all_msg(chat_id, text, reply=None):
+    async def send(app):
+        try: await app.bot.send_message(chat_id, text, reply_to_message_id=reply)
+        except: pass
+    await asyncio.gather(*[send(a) for a in bot_apps])
+
+async def all_react(chat_id, msg_id):
+    await asyncio.gather(*[a.bot.set_message_reaction(chat_id, msg_id, REACT_EMOJI) for a in bot_apps], return_exceptions=True)
+
+async def menu(update, context):
+    await update.message.reply_text("""⚡ ULTRON
+/destroy /stopdestruction
+/attack /stopattack
+/spam /gcname /stopgcname
+/react /stopreact
+/reply <text>
+/sudo /takesudo /sudolist
+/check /stopall""")
+
+async def destroy(update, context):
+    global destroy_name, destroy_active
+    if not ok(update.effective_user.id): return
+    if not context.args: return
+    destroy_name = context.args[0]; destroy_active = True
+    asyncio.create_task(destroy_loop(update.effective_chat.id))
+
+async def destroy_loop(chat_id):
+    while destroy_active and destroy_name:
+        await all_msg(chat_id, stretch(f"{destroy_name} {random.choice(DESTROY_TEXTS)}"))
+        await asyncio.sleep(0.02)
+
+async def stopdestruction(update, context):
+    global destroy_active
+    if not ok(update.effective_user.id): return
+    destroy_active = False
+
+async def attack(update, context):
+    global attack_id
+    if not ok(update.effective_user.id): return
+    if not update.message.reply_to_message: return
+    attack_id = update.message.reply_to_message.from_user.id
+
+async def stopattack(update, context):
+    global attack_id
+    if not ok(update.effective_user.id): return
+    attack_id = None
+
+async def reply_cmd(update, context):
+    global custom_text, attack_id
+    if not ok(update.effective_user.id): return
+    if not context.args: return
+    custom_text = " ".join(context.args)
+    if update.message.reply_to_message:
+        attack_id = update.message.reply_to_message.from_user.id
+
+async def spam(update, context):
+    global spam_text, spam_active
+    if not ok(update.effective_user.id): return
+    if not update.message.reply_to_message or not update.message.reply_to_message.text: return
+    spam_text = stretch(update.message.reply_to_message.text); spam_active = True
+    asyncio.create_task(spam_loop(update.effective_chat.id))
+
+async def spam_loop(chat_id):
+    while spam_active and spam_text:
+        await all_msg(chat_id, spam_text)
+        await asyncio.sleep(0.01)
+
+async def gcname(update, context):
+    global gcname_text, gcname_active
+    if not ok(update.effective_user.id): return
+    if not context.args: return
+    gcname_text = " ".join(context.args); gcname_active = True
+    asyncio.create_task(gcname_loop(update.effective_chat.id))
+
+async def gcname_loop(chat_id):
+    while gcname_active and gcname_text:
+        tasks = [bot.bot.set_chat_title(chat_id, f"{gcname_text} {NC_GLITCH}"[:255]) for bot in bot_apps]
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.sleep(0.2)
+
+async def stopgcname(update, context):
+    global gcname_active
+    if not ok(update.effective_user.id): return
+    gcname_active = False
+
+async def react(update, context):
+    global react_id
+    if not ok(update.effective_user.id): return
+    if not context.args: return
+    react_id = int(context.args[0])
+
+async def stopreact(update, context):
+    global react_id
+    if not ok(update.effective_user.id): return
+    react_id = None
+
+async def stopall(update, context):
+    global destroy_active, attack_id, gcname_active, spam_active, react_id
+    if not ok(update.effective_user.id): return
+    destroy_active = attack_id = gcname_active = spam_active = False; react_id = None
+
+async def check(update, context):
+    await all_msg(update.effective_chat.id, "⚡")
+
+async def sudo(update, context):
+    if update.effective_user.id != OWNER_ID: return
+    if context.args: sudo_users.add(int(context.args[0])); save_sudo()
+
+async def takesudo(update, context):
+    if update.effective_user.id != OWNER_ID: return
+    if context.args:
+        uid = int(context.args[0])
+        if uid != OWNER_ID: sudo_users.discard(uid); save_sudo()
+
+async def sudolist(update, context):
+    await update.message.reply_text(f"Sudo: {sudo_users}")
+
+async def handler(update, context):
+    global attack_id, custom_text, react_id
+    if not update.message or not update.message.from_user: return
+    chat_id = update.effective_chat.id; user_id = update.message.from_user.id; msg_id = update.message.message_id
+    if react_id and user_id == react_id: await all_react(chat_id, msg_id)
+    if attack_id and user_id == attack_id:
+        text = custom_text if custom_text else random.choice(DESTROY_TEXTS)
+        await all_msg(chat_id, text, msg_id)
+
+def main():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(init_bots())
+    app = Application.builder().token(TOKENS[0]).build()
+    for c in [menu, destroy, stopdestruction, attack, stopattack, reply_cmd, spam, gcname, stopgcname, react, stopreact, stopall, check, sudo, takesudo, sudolist]:
+        app.add_handler(CommandHandler(c.__name__.replace('_cmd',''), c) if c == reply_cmd else CommandHandler(c.__name__, c))
+    app.add_handler(CommandHandler("reply", reply_cmd))
+    app.add_handler(MessageHandler(filters.ALL, handler))
+    app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+
+if __name__ == "__main__":
+    main()
